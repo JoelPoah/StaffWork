@@ -1,0 +1,5 @@
+*extracted
+*uploads
+*node_modules
+*.docx
+*.zip

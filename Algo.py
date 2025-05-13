@@ -1,174 +1,244 @@
-import docx
 import os
-from docx.shared import Pt
-from docx.oxml.ns import qn
-from docx.oxml import OxmlElement
+import shutil
+import zipfile
+from pathlib import Path
 
-def extract_font_information(file_path):
-    """Extract detailed font information from a Word document, including style definitions."""
-    print(f"Analyzing document: {file_path}")
-    doc = docx.Document(file_path)
-    
-    # Dictionary to store font information
-    font_info = {}
-    style_info = {}
-    
-    # Extract style information
-    print("\nSTYLE DEFINITIONS:")
-    for style in doc.styles:
-        if hasattr(style, 'font') and style.font:
-            font_name = style.font.name
-            font_size = style.font.size
-            
-            # Convert font size from docx internal units to points if it exists
-            if font_size is not None:
-                # Font size in docx is in half-points
-                font_size_pt = font_size / 12.0
-            else:
-                font_size_pt = "Default"
-                
-            style_info[style.name] = {
-                'font_name': font_name,
-                'font_size_pt': font_size_pt
-            }
-            
-            print(f"Style: {style.name}, Font: {font_name}, Size: {font_size_pt}")
-    
-    # Extract document default font information
-    print("\nDOCUMENT DEFAULT SETTINGS:")
-    try:
-        default_font = doc.styles['Normal'].font
-        default_font_name = default_font.name
-        default_font_size = default_font.size
-        
-        if default_font_size is not None:
-            default_font_size_pt = default_font_size / 12.0
-        else:
-            default_font_size_pt = "Default"
-            
-        print(f"Default Font: {default_font_name}, Size: {default_font_size_pt}")
-    except:
-        print("Could not determine document default settings")
-    
-    # Extract XML-level font information
-    print("\nXML-LEVEL FONT INFORMATION:")
-    try:
-        # Get the document's XML
-        xml_body = doc._body._element.xml
-        
-        # Check if Times New Roman is mentioned in the XML
-        if "Times New Roman" in xml_body:
-            print("Times New Roman font found in document XML")
-        else:
-            print("Times New Roman font NOT found in document XML")
-            
-        # Check for font size 14 (28 half-points)
-        if "sz w:val=\"28\"" in xml_body:
-            print("Font size 14 (28 half-points) found in document XML")
-        else:
-            print("Font size 14 (28 half-points) NOT found in document XML")
-    except:
-        print("Could not analyze document XML")
-    
-    # Analyze paragraphs with more detailed information
-    print("\nDETAILED PARAGRAPH ANALYSIS:")
-    for i, paragraph in enumerate(doc.paragraphs):
-        if paragraph.text.strip():  # Only analyze non-empty paragraphs
-            print(f"\nParagraph {i+1}: '{paragraph.text[:50]}...' if len(paragraph.text) > 50 else paragraph.text")
-            print(f"  Style: {paragraph.style.name}")
-            
-            # Get font information from runs within the paragraph
-            for j, run in enumerate(paragraph.runs):
-                if run.text.strip():  # Only report on runs with actual text
-                    # Try to get direct font information
-                    font_name = run.font.name
-                    font_size = run.font.size
-                    
-                    # If direct font info is None, try to get from style
-                    if font_name is None and paragraph.style.name in style_info:
-                        font_name = style_info[paragraph.style.name]['font_name']
-                    
-                    if font_size is None and paragraph.style.name in style_info:
-                        font_size_pt = style_info[paragraph.style.name]['font_size_pt']
-                    else:
-                        # Convert font size from docx internal units to points if it exists
-                        if font_size is not None:
-                            font_size_pt = font_size / 12.0
-                        else:
-                            font_size_pt = "Default"
-                    
-                    print(f"  Run {j+1}: Font: {font_name or 'Default'}, Size: {font_size_pt}, Text: '{run.text[:20]}...' if len(run.text) > 20 else run.text")
-                    
-                    # Try to get XML-level font information for this run
-                    try:
-                        run_element = run._element.xml
-                        if "w:rFonts" in run_element:
-                            print(f"    XML font info found in run")
-                        if "w:sz" in run_element:
-                            print(f"    XML font size info found in run")
-                    except:
-                        pass
-                    
-                    # Add to font info dictionary
-                    key = f"{font_name}_{font_size_pt}"
-                    if key in font_info:
-                        font_info[key]['count'] += 1
-                        font_info[key]['characters'] += len(run.text)
-                    else:
-                        font_info[key] = {
-                            'font_name': font_name,
-                            'font_size_pt': font_size_pt,
-                            'count': 1,
-                            'characters': len(run.text)
-                        }
-    
-    # Summary of font usage
-    print("\nFONT USAGE SUMMARY:")
-    for key, info in font_info.items():
-        print(f"Font: {info['font_name'] or 'Default'}, Size: {info['font_size_pt']}, Occurrences: {info['count']}, Characters: {info['characters']}")
-    
-    # Check document properties for theme information
-    print("\nDOCUMENT PROPERTIES:")
-    try:
-        core_properties = doc.core_properties
-        print(f"Title: {core_properties.title}")
-        print(f"Author: {core_properties.author}")
-        print(f"Created: {core_properties.created}")
-        print(f"Modified: {core_properties.modified}")
-    except:
-        print("Could not access document properties")
-    
-    # Final assessment
-    print("\nFINAL ASSESSMENT:")
-    # Check if Normal style is Times New Roman 14
-    normal_style_correct = False
-    if 'Normal' in style_info:
-        normal_font = style_info['Normal']['font_name']
-        normal_size = style_info['Normal']['font_size_pt']
-        
-        if normal_font == 'Times New Roman' and normal_size == 14.0:
-            normal_style_correct = True
-            print("✓ Normal style is set to Times New Roman, size 14")
-        else:
-            print(f"✗ Normal style is set to {normal_font or 'Default'}, size {normal_size}")
-    
-    # Check XML for Times New Roman and size 14
-    xml_correct = False
-    if "Times New Roman" in xml_body and "sz w:val=\"28\"" in xml_body:
-        xml_correct = True
-        print("✓ Document XML contains Times New Roman font and size 14 references")
-    
-    # Final verdict
-    if normal_style_correct or xml_correct:
-        print("\n✓ Document likely meets the requirement: Times New Roman, size 14")
-        print("Note: Some text may still have different formatting if explicitly overridden")
-    else:
-        print("\n✗ Document likely does not meet the requirement: Times New Roman, size 14")
-        print("Recommendation: Apply Times New Roman, size 14 to the Normal style and all text in the document")
+# Define WordprocessingML namespace
+W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
 
-if __name__ == "__main__":
-    file_path = "/home/ubuntu/upload/BEATRICE CHONG_STAFF_PAPER.docx"
-    if os.path.exists(file_path):
-        extract_font_information(file_path)
+def convert_docx_to_zip(docx_path):
+    """
+    Renames a .docx file to .zip and returns the zip path.
+    """
+    docx_path = Path(docx_path)
+    if docx_path.suffix != '.docx':
+        raise ValueError("Input file must be a .docx file")
+
+    zip_path = docx_path.with_suffix('.zip')
+    shutil.copy(docx_path, zip_path)
+    print(f"Converted {docx_path.name} to {zip_path.name}")
+    return zip_path
+
+def extract_zip_to_unique_folder(zip_path, base_extract_dir="extracted"):
+    """
+    Extracts the zip file to a unique folder based on filename.
+    """
+    zip_path = Path(zip_path)
+    folder_name = zip_path.stem + "_unzipped"
+    extract_dir = Path(base_extract_dir) / folder_name
+    extract_dir.mkdir(parents=True, exist_ok=True)
+
+    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+        zip_ref.extractall(extract_dir)
+    
+    print(f"Extracted to: {extract_dir}")
+    return extract_dir
+
+
+
+import xml.etree.ElementTree as ET
+from pathlib import Path
+import zipfile
+
+
+# Function to convert twips to centimeters
+def twips_to_cm(twips):
+    inches = twips / 1440
+    return inches * 2.54
+
+
+
+# Helper to access namespaced attributes
+def get_attr(elem, attr):
+    return elem.attrib.get(f'{{{W}}}{attr}')
+
+
+
+
+
+
+
+# All functions below are for validating the structure of the document.xml file
+
+
+def validate_page_size_margins(root,issues):
+    ns = {'w': W}
+    # Check page size
+    pgSz = root.find('.//w:sectPr/w:pgSz', ns)
+    if get_attr(pgSz, 'w') != '12240' or \
+       get_attr(pgSz, 'h') != '15840' or \
+       get_attr(pgSz, 'orient') != 'portrait':
+        issues.append("Page size or orientation NOT set to A4 portrait (w=12240, h=15840). Could be due to margins.")
+
+    # Check margins
+    pgMar = root.find('.//w:sectPr/w:pgMar', ns)
+    expected_margins = {
+        'top': '1418',
+        'right': '1418',
+        'bottom': '1418',
+        'left': '1418',
+        'header': '567',
+        'footer': '567',
+        'gutter': '0'
+    }
+    if any(get_attr(pgMar, k) != v for k, v in expected_margins.items()):
+        # show the current values of the margins
+        issues.append("Margin of 2.5cm NOT reflected")
+    return issues
+
+def validate_font_size(root,issues):
+    ns = {'w':W}
+    # Loop through all rPr (run properties) blocks
+    for i, rPr in enumerate(root.findall('.//w:rPr', ns), start=1):
+        rFonts = rPr.find('w:rFonts', ns)
+
+        # Ensure rFonts exists and check font declarations
+        if rFonts is not None:
+            ascii_font = get_attr(rFonts, 'ascii')
+            hAnsi_font = get_attr(rFonts, 'hAnsi')
+            cs_font = get_attr(rFonts, 'cs')
+
+            # Check if the fonts are not "Times New Roman"
+            if ascii_font != 'Times New Roman' or hAnsi_font != 'Times New Roman' or cs_font != 'Times New Roman':
+                issues.append(f"Line {i}: ascii={ascii_font}, hAnsi={hAnsi_font}, cs={cs_font}")
+
+        # Check font size (w:sz and w:szCs)
+        sz = rPr.find('w:sz', ns)
+        szCs = rPr.find('w:szCs', ns)
+        sz_val = get_attr(sz, 'val') if sz is not None else None
+        szCs_val = get_attr(szCs, 'val') if szCs is not None else None
+
+        # Check if either sz or szCs is neither 28 nor 24 (ignore None)
+        if (sz_val not in ['28', '24'] and sz_val is not None) or \
+           (szCs_val not in ['28', '24'] and szCs_val is not None):
+            issues.append(f"Line {i}: font size w:sz={sz_val}, w:szCs={szCs_val} (expected 28 for 14pt or 24 for 12pt)")
+
+    return issues
+
+def validate_font_type(root,issues):
+    ns = {'w': W}
+    
+    allowed_fonts = ['Times New Roman', None,"None"]
+    # Loop through all rPr (run properties) blocks
+    for i, rPr in enumerate(root.findall('.//w:rPr', ns), start=1):
+        rFonts = rPr.find('w:rFonts', ns)
+
+        # Ensure rFonts exists and check font declarations
+        if rFonts is not None:
+            ascii_font = get_attr(rFonts, 'ascii')
+            hAnsi_font = get_attr(rFonts, 'hAnsi')
+            cs_font = get_attr(rFonts, 'cs')
+
+            # Check if the fonts are not in the allowed list
+            if ascii_font not in allowed_fonts or hAnsi_font not in allowed_fonts or cs_font not in allowed_fonts:
+                issues.append(f"Line {i}: ascii={ascii_font}, hAnsi={hAnsi_font}, cs={cs_font}")
+    return issues
+
+def validate_line_spacing(root,issues):
+    '''
+    Validates line spacing in the document.xml file looking at the w:line feature.
+    However this may not be working properly 
+    
+    '''
+    ns = {'w': W}
+    # Loop through all rPr (run properties) blocks
+    for i, rPr in enumerate(root.findall('.//w:rPr', ns), start=1):
+        spacing = rPr.find('w:spacing', ns)
+        if spacing is not None:
+            line = get_attr(spacing, 'line')
+            lineRule = get_attr(spacing, 'lineRule')
+            if line != '240' or lineRule != 'auto':
+                issues.append(f"Line {i}: line={line}, lineRule={lineRule} (expected 240 and auto)")
+    return issues
+
+def validate_underline_bold(root,issues):
+    '''Checks whether any fullstop is underlined or bolded. If it is raise an issue
+    Looks good but not tested
+    '''
+    ns = {'w': W}
+    # Find all text that are underlined 
+    underlined_texts = root.findall('.//w:u', ns)
+    # Find all text that are bolded
+    bolded_texts = root.findall('.//w:b', ns)
+    # Check if any of the texts are underlined or bolded
+    if underlined_texts or bolded_texts:
+        # Append line in which the underlined or bolded text is found
+        for i, text in enumerate(underlined_texts + bolded_texts, start=1):
+            if text.text and '.' in text.text:
+                issues.append(f"Line {i}: Found underlined or bolded text with fullstop: {text.text}")
+    return issues
+
+def validate_justified_text(root,issues):
+    '''Checks whether any text is justified. If it is raise an issue
+    Looks good but not tested
+    '''
+    jc_values={'left':'Left-aligned',
+    'center':'Centered',
+    'right':'Right-aligned',
+    'both':'Justified'}
+    
+    ns = {'w': W}
+    # Find all text that are justified 
+    justified_texts = root.findall('.//w:jc', ns)
+    # Check if any of the texts are justified
+    if justified_texts:
+        # Append line in which the justified text is found
+        for i, text in enumerate(justified_texts, start=1):
+            if text.text and 'center' in text.text:
+                issues.append(f"Line {i}: Found justified text: {text.text}")
+    return issues
+
+
+
+
+def validate_docx_structure(document_xml_path):
+    """
+    Validates the structure of the document.xml file in a .docx file.
+    """
+    issues = []
+
+    # Parse XML
+    tree = ET.parse(document_xml_path)
+    root = tree.getroot()
+
+
+    # Validate page size and margins
+    issues = validate_page_size_margins(root,issues)
+    
+    # Validate font properties
+    issues = validate_font_type(root,issues)
+    issues = validate_font_size(root,issues)
+    # Validate line spacing
+    issues = validate_line_spacing(root,issues)
+    
+    # Validate underline and bold
+    issues = validate_underline_bold(root,issues)
+    # Validate justified text
+    issues = validate_justified_text(root,issues)
+    
+    return issues
+
+
+
+
+
+# Example usage:
+# docx_path = "Papers/BRYAN_KOH_ZI_QIN_XRG_MSW.docx"
+docx_path = "Papers/BEATRICE.docx"
+zip_path = convert_docx_to_zip(docx_path)
+extract_dir = extract_zip_to_unique_folder(zip_path)
+xml_path = extract_dir / "word" / "document.xml"
+xml_path = "extracted/BRYAN_KOH_ZI_QIN_XRG_MSW_unzipped/word/document.xml"
+xml_path = "extracted/BEATRICE_unzipped/word/document.xml"
+results = validate_docx_structure(xml_path)
+
+results.append("Validation complete. You should always check the sensitivity of your document.")
+
+print("Validation Results:")
+# Print the results
+for issue in results:
+    if isinstance(issue, list):
+        for sub_issue in issue:
+            print(sub_issue)
     else:
-        print(f"File not found: {file_path}")
+        print(issue)
