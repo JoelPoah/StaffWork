@@ -79,8 +79,8 @@ const loading = ref(false);
 const messagesContainer = ref(null);
 
 // API URL - update with deployed backend URL for the RAG LLM server
-const API_URL = 'https://rogh5izc991v.manus.space'; // Main backend URL
-const LLM_API_URL = 'https://rogh5izc991v.manus.space/chat'; // LLM chat endpoint
+const API_URL = import.meta.env.VITE_API_URL;; // Main backend URL
+const LLM_API_URL = import.meta.env.VITE_LLM_API_URL; // LLM chat endpoint
 
 // Methods
 const sendMessage = async () => {

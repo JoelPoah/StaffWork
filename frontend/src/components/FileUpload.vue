@@ -54,7 +54,7 @@ const loading = ref(false);
 const error = ref(null);
 
 // API URL - update with deployed backend URL
-const API_URL = 'https://5000-iry0vu3xe6eqoydn0hvz5-0e928a65.manusvm.computer';
+const API_URL = import.meta.env.VITE_API_URL;
 
 // Emits
 const emit = defineEmits([
