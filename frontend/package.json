@@ -15,6 +15,7 @@
     "axios": "^1.9.0",
     "nutrient": "^0.0.1",
     "vue": "^3.5.13",
+    "vue3-pdf-app": "^1.0.3",
     "vuetify": "^3.8.1"
   },
   "devDependencies": {
