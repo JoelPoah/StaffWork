@@ -19,6 +19,7 @@
                 @images-received="handleImages"
                 @image-references-received="handleImageReferences"
                 @file-selected="handleFileSelected"
+                @analysis-response="handleAnalysis"
               />
               
               <!-- Document visualization area using SimpleDocViewer -->
@@ -233,6 +234,20 @@ const handleDocumentLoaded = (content) => {
   // Add welcome message when document is loaded
   if (chatInterfaceRef.value) {
     chatInterfaceRef.value.addWelcomeMessage();
+  }
+};
+
+const handleAnalysis = (analysisText) => {
+  const chatComponent = chatInterfaceRef.value;
+  if (chatComponent?.addWelcomeMessage) {
+    // Optional: if you want to reset state
+    chatComponent.addWelcomeMessage();
+  }
+  if (chatComponent?.messages) {
+    chatComponent.messages.push({
+      sender: 'assistant',
+      text: analysisText
+    });
   }
 };
 

@@ -101,6 +101,22 @@ const uploadFile = async () => {
     if (response.data) {
       // Emit document content
       emit('document-loaded', response.data.content);
+
+      const analysisPrompt = `Give an analysis of the following document and be critical about its consistency and whether it has a good thought process flow to it.`;
+      try {
+        const chatResponse = await axios.post(`${import.meta.env.VITE_LLM_API_URL}`, {
+          message: analysisPrompt,
+          documentContent: response.data.content
+        });
+      
+        if (chatResponse.data?.response) {
+          // Emit to ChatInterface so it can add the message
+          emit('message-sent', analysisPrompt); // optional if you want user input shown
+          emit('analysis-response', chatResponse.data.response);
+        }
+      } catch (chatError) {
+        console.error('Error getting analysis from LLM:', chatError);
+      }
       
       // Emit validation errors
       emit('errors-received', response.data.errors || {

@@ -337,6 +337,7 @@ def chat():
                 Would you like more specific details about any part of this analysis?
                 """
             }
+            print(response)
         # For general questions about the document
         elif qa_chain and document_content:
             try:

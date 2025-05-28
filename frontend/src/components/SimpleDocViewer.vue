@@ -4,14 +4,23 @@
       <v-progress-circular indeterminate color="#D5573B" size="64"></v-progress-circular>
       <div class="mt-4">Loading document...</div>
     </div>
-    
+
     <div v-if="documentContent" class="document-content" ref="documentContentRef">
       <div v-html="processedContent"></div>
     </div>
-    
+
     <div v-else-if="!loading" class="empty-state">
       <v-icon size="large" color="#D5573B" class="mb-4">mdi-file-document-outline</v-icon>
       <div>No document loaded</div>
+    </div>
+
+    <!-- Tooltip -->
+    <div
+      v-if="tooltip.visible"
+      :style="{ top: tooltip.y + 'px', left: tooltip.x + 'px' }"
+      class="tooltip"
+    >
+      <div v-html="tooltip.content"></div>
     </div>
   </div>
 </template>
@@ -42,40 +51,42 @@ const emit = defineEmits(['error', 'viewer-loaded']);
 const documentContentRef = ref(null);
 const loading = ref(false);
 
-// Computed properties
+// Tooltip state
+const tooltip = ref({
+  visible: false,
+  content: '',
+  x: 0,
+  y: 0
+});
+
+// Computed
 const processedContent = computed(() => {
-  if (!props.documentContent) return '';
-  
-  // Return the content as is - we'll apply highlighting after render
-  return props.documentContent;
+  return props.documentContent || '';
 });
 
 // Methods
 const applyErrorHighlighting = () => {
   if (!documentContentRef.value || !props.wordErrors) return;
-  
-  // Reset any previous highlighting
+
   const allWords = documentContentRef.value.querySelectorAll('.doc-word');
   allWords.forEach(word => {
     word.classList.remove('error-word', 'warning-word');
     word.removeAttribute('data-errors');
   });
-  
-  // Apply new highlighting
+
   Object.keys(props.wordErrors).forEach(wordId => {
     const wordElement = documentContentRef.value.querySelector(`#${wordId}`);
     if (wordElement) {
       const wordInfo = props.wordErrors[wordId];
       const hasError = wordInfo.errors.some(err => err.type === 'error');
       const hasWarning = wordInfo.errors.some(err => err.type === 'warning');
-      
+
       if (hasError) {
         wordElement.classList.add('error-word');
       } else if (hasWarning) {
         wordElement.classList.add('warning-word');
       }
-      
-      // Store error data for tooltips
+
       wordElement.setAttribute('data-errors', JSON.stringify(wordInfo.errors));
     }
   });
@@ -83,75 +94,113 @@ const applyErrorHighlighting = () => {
 
 const applyImageReferenceHighlighting = () => {
   if (!documentContentRef.value || !props.imageReferences.length) return;
-  
-  // Reset any previous image reference highlighting
+
   const allImageRefs = documentContentRef.value.querySelectorAll('.img-ref');
   allImageRefs.forEach(ref => {
     ref.classList.remove('valid-ref', 'invalid-ref');
     ref.removeAttribute('data-ref-info');
   });
-  
-  // Find all words that are part of image references
+
   props.imageReferences.forEach(ref => {
     const refId = ref.id;
     const refWords = documentContentRef.value.querySelectorAll(`[data-ref-id="${refId}"]`);
-    
     refWords.forEach(wordElement => {
-      // Add appropriate class based on reference validity
       if (ref.valid) {
         wordElement.classList.add('valid-ref');
       } else {
         wordElement.classList.add('invalid-ref');
       }
-      
-      // Store reference data for tooltips
+
       wordElement.setAttribute('data-ref-info', JSON.stringify(ref));
     });
   });
 };
 
-// Watch for changes in document content
+const addHoverListeners = () => {
+  if (!documentContentRef.value) return;
+
+  const wordElements = documentContentRef.value.querySelectorAll('.doc-word, .img-ref');
+
+  wordElements.forEach(el => {
+    el.addEventListener('mouseenter', (e) => {
+      const errorData = el.getAttribute('data-errors');
+      const refData = el.getAttribute('data-ref-info');
+      const rect = el.getBoundingClientRect();
+
+      let content = '';
+      if (errorData) {
+        const errors = JSON.parse(errorData);
+        content = errors.map(err => `<div><strong>${err.type}:</strong> ${err.message}</div>`).join('');
+      } else if (refData) {
+        const ref = JSON.parse(refData);
+        content = `<div><strong>Image Ref:</strong> ${ref.description || ref.id}</div>`;
+      }
+
+      if (content) {
+        tooltip.value = {
+          visible: true,
+          content,
+          x: rect.left + window.scrollX,
+          y: rect.bottom + window.scrollY + 8
+        };
+      }
+    });
+
+    el.addEventListener('mouseleave', () => {
+      tooltip.value.visible = false;
+    });
+  });
+};
+
+// Watchers
 watch(() => props.documentContent, (newContent) => {
   if (newContent) {
     loading.value = true;
-    
-    // Wait for DOM to update, then apply highlighting
+
     nextTick(() => {
-      applyErrorHighlighting();
-      applyImageReferenceHighlighting();
-      loading.value = false;
-      emit('viewer-loaded');
+      setTimeout(() => {
+        applyErrorHighlighting();
+        applyImageReferenceHighlighting();
+        addHoverListeners(); // 👈 Add this line
+        loading.value = false;
+        emit('viewer-loaded');
+      }, 50); // 👈 Small delay ensures DOM is ready
     });
   }
 });
 
-// Watch for changes in word errors
+
 watch(() => props.wordErrors, () => {
   nextTick(() => {
     applyErrorHighlighting();
+    addHoverListeners();
   });
 }, { deep: true });
 
-// Watch for changes in image references
 watch(() => props.imageReferences, () => {
   nextTick(() => {
     applyImageReferenceHighlighting();
+    addHoverListeners();
   });
 }, { deep: true });
 
-// Initialize on mount if document is available
+// On mount
 onMounted(() => {
   if (props.documentContent) {
     loading.value = true;
-    
+
     nextTick(() => {
-      applyErrorHighlighting();
-      applyImageReferenceHighlighting();
-      loading.value = false;
-      emit('viewer-loaded');
+      setTimeout(() => {
+        applyErrorHighlighting();
+        applyImageReferenceHighlighting();
+        addHoverListeners(); // 👈 Add this
+        loading.value = false;
+        emit('viewer-loaded');
+      }, 50); // 👈 Small delay ensures DOM is updated
     });
   }
 });
+
 </script>
 
 <style scoped>
@@ -230,30 +279,45 @@ onMounted(() => {
 }
 
 .document-content :deep(.error-word) {
-  background-color: rgba(213, 87, 59, 0.2); /* Jasper with transparency */
+  background-color: rgba(213, 87, 59, 0.2);
   border-bottom: 2px solid #D5573B;
   cursor: help;
 }
 
 .document-content :deep(.warning-word) {
-  background-color: rgba(119, 125, 167, 0.2); /* Glaucous with transparency */
+  background-color: rgba(119, 125, 167, 0.2);
   border-bottom: 2px dashed #777DA7;
   cursor: help;
 }
 
 /* Image reference highlighting */
 .document-content :deep(.valid-ref) {
-  background-color: rgba(148, 201, 169, 0.2); /* Cambridge blue with transparency */
+  background-color: rgba(148, 201, 169, 0.2);
   border-bottom: 2px solid #94C9A9;
   cursor: help;
 }
 
 .document-content :deep(.invalid-ref) {
-  background-color: rgba(213, 87, 59, 0.2); /* Jasper with transparency */
+  background-color: rgba(213, 87, 59, 0.2);
   border-bottom: 2px dashed #D5573B;
   cursor: help;
 }
 
+/* Tooltip styles */
+.tooltip {
+  position: absolute;
+  background: #333;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 6px;
+  max-width: 300px;
+  font-size: 0.875em;
+  z-index: 999;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+}
+
+/* Loader */
 .loading-overlay {
   position: absolute;
   top: 0;

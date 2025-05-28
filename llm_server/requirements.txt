@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+openai
+python-dotenv
+flask
+flask-cors
+transformers
+torch
+langchain-community
+faiss-cpu
+sentence-transformers
