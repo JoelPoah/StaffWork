@@ -69,7 +69,15 @@ def validate_page_size_margins(root, issues):
         })
 
     pgMar = root.find('.//w:sectPr/w:pgMar', ns)
-    expected = {'top': '1418', 'right': '1418', 'bottom': '1418', 'left': '1418', 'header': '567', 'footer': '567', 'gutter': '0'}
+    expected = {
+        'top': 1418, 
+        'right': 1418, 
+        'bottom': 1418, 
+        'left': 1418, 
+        'header': 567, 
+        'footer': 567, 
+        'gutter': 0
+    }
     
     if pgMar is None:
         issues.append({
@@ -78,13 +86,29 @@ def validate_page_size_margins(root, issues):
             "message": "Page margin settings not found."
         })
         return issues
-        
-    if any(get_attr(pgMar, k) != v for k, v in expected.items()):
-        issues.append({
-            "type": "error",
-            "category": "formatting",
-            "message": "Margins NOT set to 2.5cm correctly."
-        })
+    
+    tolerance = 2
+    for k, v in expected.items():
+        actual = get_attr(pgMar, k)
+        print(f"{k} expected: {v}, actual: {actual}")
+        try:
+            actual_val = int(actual)
+            if abs(actual_val - v) > tolerance:
+                issues.append({
+                 "type": "error",
+                 "category": "formatting",
+                 "message": "Margins NOT set to 2.5cm correctly."
+               })
+        except ValueError:
+            issues.append(f"Margin {k} has a non-integer value: {actual}")
+            return issues
+
+    # if any(get_attr(pgMar, k) != v for k, v in expected.items()):
+    #     issues.append({
+    #         "type": "error",
+    #         "category": "formatting",
+    #         "message": "Margins NOT set to 2.5cm correctly."
+    #     })
     return issues
 
 def extract_word_level_errors(root, extract_dir):
@@ -133,7 +157,7 @@ def extract_word_level_errors(root, extract_dir):
                 font_errors = []
                 
                 if rFonts is not None:
-                    allowed_fonts = ['Times New Roman', None, "None"]
+                    allowed_fonts = ['Times New Roman', None, "None", "Times"]
                     if any(get_attr(rFonts, k) not in allowed_fonts for k in ['ascii', 'hAnsi', 'cs']):
                         font_name = get_attr(rFonts, 'ascii') or get_attr(rFonts, 'hAnsi') or "Unknown"
                         font_errors.append({

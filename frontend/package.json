@@ -1,6 +1,5 @@
 {
   "name": "docx_upload",
-  "private": true,
   "type": "module",
   "version": "0.0.0",
   "scripts": {

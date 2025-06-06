@@ -106,8 +106,9 @@ def validate_docx(docx_file_path):
                         if margins is not None:
                             left = margins.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}left')
                             right = margins.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}right')
+                            tolerance = 1
                             if left and right:
-                                if int(left) != 1440 or int(right) != 1440:  # 1 inch margins
+                                if abs(int(left) - 1440) > tolerance or abs(int(right) - 1440) > tolerance:  # 1 inch margins
                                     errors['formatting'].append({
                                         'type': 'error',
                                         'message': f'Margins NOT set to 2.5cm correctly (left={left}, right={right}).'
