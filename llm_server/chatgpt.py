@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from openai import OpenAI
 import os
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY",""))
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY","sk-2BhsRkf5K7CpVW5yg38IMLYviUm4OarHxZ-Uc8EEqjT3BlbkFJtvFLlwmfw7EPsBBpAFGXKHbKxtegkH-Jc5hlQY6yMA"))
 # client = OpenAI(api_key=os.getenv("OPENAI_API_KEY",""))
 import os
 

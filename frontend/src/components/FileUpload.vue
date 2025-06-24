@@ -99,10 +99,12 @@ const uploadFile = async () => {
     
     // Process response
     if (response.data) {
+
       // Emit document content
       emit('document-loaded', response.data.content);
 
-      const analysisPrompt = `Give an analysis of the following document and be critical about its consistency and whether it has a good thought process flow to it.`;
+      const errorsString = JSON.stringify(response.data.errors.summary, null, 2); // pretty print
+      const analysisPrompt = `Give an analysis of the following document and be critical about its consistency and whether it has a good thought process flow to it. These are the errors: ${errorsString}`;
       try {
         const chatResponse = await axios.post(`${import.meta.env.VITE_LLM_API_URL}`, {
           message: analysisPrompt,
@@ -112,7 +114,8 @@ const uploadFile = async () => {
         if (chatResponse.data?.response) {
           // Emit to ChatInterface so it can add the message
           emit('message-sent', analysisPrompt); // optional if you want user input shown
-          emit('analysis-response', chatResponse.data.response);
+
+          emit('analysis-response', String(chatResponse.data.response));
         }
       } catch (chatError) {
         console.error('Error getting analysis from LLM:', chatError);

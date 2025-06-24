@@ -55,18 +55,9 @@ import axios from 'axios';
 
 // Props
 const props = defineProps({
-  documentLoaded: {
-    type: Boolean,
-    default: false
-  },
-  documentErrors: {
-    type: Object,
-    default: () => ({})
-  },
-  documentContent: {
-    type: String,
-    default: ''
-  }
+  documentLoaded: Boolean,
+  documentErrors: Object,
+  documentContent: String
 });
 
 // Emits
@@ -78,9 +69,9 @@ const messages = ref([]);
 const loading = ref(false);
 const messagesContainer = ref(null);
 
-// API URL - update with deployed backend URL for the RAG LLM server
-const API_URL = import.meta.env.VITE_API_URL;; // Main backend URL
-const LLM_API_URL = import.meta.env.VITE_LLM_API_URL; // LLM chat endpoint
+// API URLs (update as needed)
+const API_URL = import.meta.env.VITE_API_URL;
+const LLM_API_URL = import.meta.env.VITE_LLM_API_URL;
 
 // Methods
 const sendMessage = async () => {
@@ -88,54 +79,42 @@ const sendMessage = async () => {
   
   const userMessage = userInput.value.trim();
   
-  // Add user message to chat
   messages.value.push({
     sender: 'user',
     text: userMessage
   });
   
-  // Clear input
   userInput.value = '';
   
-  // Scroll to bottom
   await nextTick();
   scrollToBottom();
   
-  // Show loading indicator
   loading.value = true;
   
   try {
-    // Send message to LLM backend
     const response = await axios.post(LLM_API_URL, {
       message: userMessage,
       documentContent: props.documentContent
     });
     
-    // Add assistant response
     if (response.data && response.data.response) {
       messages.value.push({
         sender: 'assistant',
         text: response.data.response
       });
     } else {
-      // Fallback response if API fails
       messages.value.push({
         sender: 'assistant',
         text: "I'm sorry, I couldn't process your request. Please try again later."
       });
     }
     
-    // Emit event
     emit('message-sent', userMessage);
   } catch (error) {
     console.error('Error sending message:', error);
     
-    // Add error message with more helpful information
     let errorMessage = "I'm sorry, I couldn't process your request.";
-    
     if (error.response) {
-      // The request was made and the server responded with a status code
-      // that falls out of the range of 2xx
       if (error.response.status === 500) {
         errorMessage += " The server encountered an internal error. Please try again later.";
       } else if (error.response.status === 400) {
@@ -144,10 +123,8 @@ const sendMessage = async () => {
         errorMessage += " The chat service is currently unavailable. Please try again later.";
       }
     } else if (error.request) {
-      // The request was made but no response was received
       errorMessage += " No response received from the server. Please check your connection and try again.";
     } else {
-      // Something happened in setting up the request that triggered an Error
       errorMessage += " An unexpected error occurred. Please try again.";
     }
     
@@ -157,8 +134,6 @@ const sendMessage = async () => {
     });
   } finally {
     loading.value = false;
-    
-    // Scroll to bottom after response
     await nextTick();
     scrollToBottom();
   }
@@ -171,74 +146,55 @@ const scrollToBottom = () => {
 };
 
 const addWelcomeMessage = () => {
-  // Clear existing messages
   messages.value = [];
-  
-  // Add welcome message
   messages.value.push({
     sender: 'assistant',
-    text: 'Your document has been uploaded. How can I help you with it today? You can ask me to analyze the document, check for grammar issues, or suggest vocabulary improvements.'
+    text: 'Hello! Please upload a document to get started. I can help you analyze the document, check for grammar issues, and suggest improvements.'
   });
-  
-  // If there are errors, add a message about them
-  if (props.documentErrors && 
-      props.documentErrors.summary && 
-      props.documentErrors.summary.length > 0) {
-    
-    const errorCount = props.documentErrors.summary.find(s => s.message && s.message.includes('Found'));
-    
-    if (errorCount) {
-      messages.value.push({
-        sender: 'assistant',
-        text: `I've detected some formatting issues in your document. ${errorCount.message} Words with errors are highlighted - hover over them to see details.`
-      });
-    }
-  }
-  
-  // Scroll to bottom
   nextTick(scrollToBottom);
 };
 
-// Watch for document loaded changes
+// New method to set messages array from parent
+const setMessages = (newMessages) => {
+  messages.value = newMessages;
+  nextTick(scrollToBottom);
+};
+
+// Watch documentLoaded prop to show welcome when document is loaded
 watch(() => props.documentLoaded, (newVal) => {
-  if (newVal) {
+  if (newVal && messages.value.length === 0) {
     addWelcomeMessage();
   }
 });
 
-// Lifecycle hooks
 onMounted(() => {
-  // Add initial message
   if (messages.value.length === 0) {
-    messages.value.push({
-      sender: 'assistant',
-      text: 'Hello! Please upload a document to get started. I can help you analyze the document, check for grammar issues, and suggest improvements.'
-    });
+    addWelcomeMessage();
   }
 });
 
-// Expose methods to parent component
+// Expose methods and reactive state to parent
 defineExpose({
-  addWelcomeMessage
+  addWelcomeMessage,
+  setMessages,
+  messages
 });
 </script>
 
 <style scoped>
+/* Your existing styles here, unchanged */
 .chat-interface {
   position: relative;
   border-radius: 0;
 }
-
 .chat-header {
-  background-color: #885053; /* Rose taupe */
+  background-color: #885053;
 }
-
 .chat-messages {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
 }
-
 .message-bubble {
   max-width: 80%;
   padding: 12px 16px;
@@ -247,47 +203,38 @@ defineExpose({
   position: relative;
   word-break: break-word;
 }
-
 .user-message {
   align-self: flex-end;
-  background-color: #D5573B; /* Jasper */
+  background-color: #D5573B;
   color: white;
   margin-left: auto;
   border-bottom-right-radius: 4px;
 }
-
 .assistant-message {
   align-self: flex-start;
-  background-color: #C6ECAE; /* Tea green */
+  background-color: #C6ECAE;
   color: #333;
   margin-right: auto;
   border-bottom-left-radius: 4px;
 }
-
 .message-content {
   line-height: 1.4;
-  white-space: pre-line; /* Preserve line breaks in responses */
+  white-space: pre-line;
 }
-
 .chat-input {
   background-color: rgba(0, 0, 0, 0.1);
 }
-
 .chat-input-field {
   border-radius: 24px;
 }
-
 .chat-footer {
   background-color: rgba(0, 0, 0, 0.2);
 }
-
-/* Typing indicator */
 .typing-indicator {
   display: flex;
   align-items: center;
   margin: 10px 0;
 }
-
 .dot {
   width: 8px;
   height: 8px;
@@ -296,15 +243,12 @@ defineExpose({
   margin: 0 2px;
   animation: bounce 1.5s infinite ease-in-out;
 }
-
 .dot:nth-child(2) {
   animation-delay: 0.2s;
 }
-
 .dot:nth-child(3) {
   animation-delay: 0.4s;
 }
-
 @keyframes bounce {
   0%, 60%, 100% {
     transform: translateY(0);

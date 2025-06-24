@@ -23,16 +23,17 @@
               />
               
               <!-- Document visualization area using SimpleDocViewer -->
-              <v-sheet v-if="documentContent" class="doc-preview mt-4 pa-4" rounded elevation="1" color="white">
+              <v-sheet v-if="documentLoaded" class="doc-preview mt-4 pa-4" rounded elevation="1" color="white">
                 <!-- Use SimpleDocViewer for document display -->
-                <SimpleDocViewer
+                <!-- <SimpleDocViewer
                   :document-content="documentContent"
                   :word-errors="wordErrors"
                   :image-references="imageReferences"
                   @viewer-loaded="handleViewerLoaded"
                   @error="handleViewerError"
                   class="simple-viewer"
-                />
+                /> -->
+                <PDFViewer/>
                 
                 <!-- Empty state -->
                 <div v-if="!documentContent" class="text-center py-8 text-medium-emphasis">
@@ -177,6 +178,8 @@ import { ref, computed, watch, onMounted, nextTick } from 'vue';
 import FileUpload from './components/FileUpload.vue';
 import ChatInterface from './components/ChatInterface.vue';
 import SimpleDocViewer from './components/SimpleDocViewer.vue';
+import PDFViewer from './components/PDFViewer.vue'
+
 
 // Document state
 const documentContent = ref(null);
@@ -230,26 +233,30 @@ const handleFileSelected = (file) => {
 const handleDocumentLoaded = (content) => {
   console.log('Document loaded with content length:', content ? content.length : 0);
   documentContent.value = content;
-  
-  // Add welcome message when document is loaded
-  if (chatInterfaceRef.value) {
-    chatInterfaceRef.value.addWelcomeMessage();
-  }
 };
 
 const handleAnalysis = (analysisText) => {
+
   const chatComponent = chatInterfaceRef.value;
-  if (chatComponent?.addWelcomeMessage) {
-    // Optional: if you want to reset state
-    chatComponent.addWelcomeMessage();
+  if (!chatComponent) {
+    console.warn('ChatInterface ref is not ready');
+    return;
   }
-  if (chatComponent?.messages) {
-    chatComponent.messages.push({
+
+  // Use the exposed method in ChatInterface to set messages reactively
+  chatComponent.setMessages([
+    {
+      sender: 'assistant',
+      text: 'Your document has been uploaded. How can I help you with it today?'
+    },
+    {
       sender: 'assistant',
       text: analysisText
-    });
-  }
+    }
+  ]);
 };
+
+
 
 const handleViewerLoaded = () => {
   console.log('Document viewer loaded successfully');
